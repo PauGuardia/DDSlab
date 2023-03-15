@@ -1,6 +1,6 @@
 ---
 title: "Analysis of Qualys KDB"
-author: "Humbert Costas"
+author: "Pau Guàrdia"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -9,39 +9,74 @@ output: html_document
 knitr::opts_chunk$set(echo = FALSE)
 
 library(kableExtra)
+library(rvest)
+library(xml2)
 
 raw.file = "../../data/qualys/latest.qkdb.xml.zip"
 ```
 
 # Qualys KDB
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam vitae erat dignissim, placerat nisi vitae, viverra ipsum. Etiam consectetur mattis pellentesque. Duis at porttitor eros. Morbi nisl eros, luctus efficitur dui ac, ultricies vulputate leo. Vestibulum accumsan, nunc id faucibus finibus, tellus ipsum venenatis odio, in luctus nisi lectus vel orci. Etiam pretium imperdiet lobortis. Vestibulum ut neque nec erat tempor laoreet et at erat. Nam varius dolor non neque maximus, ut egestas enim ultrices. Integer porttitor, leo id ornare pharetra, tellus erat cursus metus, eget rutrum augue dui at justo.
+Del fichero xml de la base de datos de Qualys hemos podido sacar información bastante relevante que incluiremos en una tabla a continuación. Cabe a destacar que dicha base de datos contiene mucha más información sobre las vulnerabilidades que las mostradas, pero son las que pensamos que pueden ser más relevantes.
+A las columnas iniciales se ha añadido una nueva que incluye el score de la vulnerabilidad CVSS si es que esta lo tiene asociado.
+Como podéis imaginar la tabla contiene muchas vulnerabilidades (aproximadamente 49.000), por lo que solamente mostraremos en este reporte las 5 primeras entradas:
 
 ```{r read_raw}
 doc <- xml2::read_xml(raw.file)
-
-kdb <- data.frame(qid = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/QID")),
-                  title = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/TITLE")),
-                  vuln_type = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/VULN_TYPE")),
-                  category = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/CATEGORY")),
-                  severity = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/SEVERITY_LEVEL")),
-                  patchable = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/PATCHABLE")),
-                  published = rvest::html_text(rvest::html_elements(doc, xpath = "//VULN/LAST_SERVICE_MODIFICATION_DATETIME")),
+vulns <- xml_find_all(doc, xpath = "//VULN")
+#Nos creamos un vector para cada una de las columnas que queremos incluir en el dataFrame.
+qids <- html_text(html_elements(doc, xpath = "//VULN/QID"))
+vuln_types <- html_text(html_elements(doc, xpath = "//VULN/VULN_TYPE"))
+categories <- html_text(html_elements(doc, xpath = "//VULN/CATEGORY"))
+severities <- html_text(html_elements(doc, xpath = "//VULN/SEVERITY_LEVEL"))
+published_dates <- html_text(html_elements(doc, xpath = "//VULN/PUBLISHED_DATETIME"))
+modified_dates <- html_text(html_elements(doc, xpath = "//VULN/LAST_SERVICE_MODIFICATION_DATETIME"))
+vcss_list <-  html_text(xml_find_first(vulns, "./CVSS/BASE"))
+kdb <- data.frame(qid = qids,
+                  vuln_type = vuln_types,
+                  category = categories,
+                  severity = severities,
+                  published_date = published_dates,
+                  modified_date = modified_dates,
+                  vcss = vcss_list,
                   stringsAsFactors = FALSE)
-kdb$published <- as.POSIXct.POSIXlt(strptime(x = kdb$published, format = "%Y-%m-%dT%TZ"))
+kdb$published_date <- as.POSIXct.POSIXlt(strptime(x = kdb$published_date, format = "%Y-%m-%dT%TZ"))
+kdb$modified_date <- as.POSIXct.POSIXlt(strptime(x = kdb$modified_date, format = "%Y-%m-%dT%TZ"))
 
 kable(head(kdb)) %>% kable_styling()
 ```
 
 ## Including Cybersecurity Standards
 
-Aliquam erat volutpat. Proin eget arcu et erat viverra eleifend. Quisque suscipit interdum blandit. Cras suscipit, nibh at mattis varius, purus massa pretium est, a malesuada felis velit sed leo. Nam quis malesuada orci. Aliquam consectetur molestie purus in rutrum. Curabitur purus libero, blandit vitae tempus quis, pharetra sit amet ex. Integer ligula lorem, gravida ac dui rutrum, sodales egestas augue. Etiam bibendum risus elit, quis dictum erat tristique id. Sed vulputate, turpis vel commodo molestie, lacus dui varius velit, vitae maximus tellus neque in urna. Donec non purus elementum, condimentum mi eu, semper dolor. Suspendisse malesuada turpis vel libero blandit varius. Cras rhoncus facilisis nunc sed efficitur. Suspendisse suscipit vel dui ut semper. Donec pellentesque tincidunt tincidunt.
+En este apartado queríamos intentar relacionar las vulnerabilidades con los distintos códigos CVE asociados a ellas. Este hecho no lo hemos eguguiie los códigos que hechos son demasido lentos computacionalmente.
+Por un lado se ha usado la siguiente función:
 
-```{r add_cve, echo=FALSE}
-
+```{r echo=TRUE, eval=FALSE}
+cve_list <- sapply(vulns, function(x) {
+  cve_nodes <- xml_find_all(x, ".//CVE/ID")
+  if (length(cve_nodes) > 0) {
+    paste(xml_text(cve_nodes), collapse = ",")
+  } else {
+    NA
+  }
+})
 
 ```
 
+Principalmente lo que se buscaba aquí era intentar sacar una lista de todas las CVE que se encontraban y con la función sapply, poderlas agrupar (con la funcion paste), separadas por comas, según la vulnerabilidad a la que pertenecían.
+Observando que el tiempo de computación era mejor que usando un for pero aún así tardaba demasiado, se ha valorado la opción de usar una nueva función. Intentando plasmar el mismo pensamiento que el anterior, se ha probado de usar la función map:
+
+```{r echo=TRUE, eval=FALSE}
+cve_list <- map(vuln_list, ~{
+  cve_nodes <- xml_find_all(.x, ".//CVE/ID")
+  if (length(cve_nodes) > 0) {
+    paste(xml_text(cve_nodes), collapse = ",")
+  } else {
+    NA_character_
+  }
+})
+```
+
+Aún así la función era demasiado costosa computacionalmente.
 ```{r add_cwe, echo=FALSE}
 
 
@@ -54,4 +89,5 @@ Aliquam erat volutpat. Proin eget arcu et erat viverra eleifend. Quisque suscipi
 
 ## Conclusion
 
-Ut finibus, metus in tristique blandit, purus quam vulputate sapien, vitae rhoncus nunc orci et leo. Duis id justo bibendum, molestie nulla eget, ullamcorper massa. Sed porttitor leo tellus, a tristique nisi tincidunt lobortis. Donec in orci imperdiet, lobortis lorem hendrerit, vestibulum dolor. Proin laoreet, orci at iaculis blandit, odio ligula commodo nunc, eu pulvinar justo tortor sed eros. Ut convallis condimentum purus, ac viverra neque maximus ac. Vestibulum consequat facilisis odio vel tempor.
+En conclusion, aunque no hemos podido sacar las CVE asociadas a las vulnerabilidades de QUALYS, una vez conseguido esto se podrían realizar cruces con otras tablas, como podría ser la de la propia base de datos de la CVE.org y así poder sacar información extra como a que versiones y SO afecta, etc.
+Por otro lado con la inclusión de más datos en la tabla, se podrían realizar más gráficos al respecto. Algunos que se han valorado podría ser uno obteniendo un gráfico temporal y observar cuantas vulnerabilidades se han publicado a lo largo del tiempo, otra que podría mostrar, usando el valor CVSS, la cantidad de vulnerabilidades críticas y quizas tambien mostrar el número de vulnerablidades por humbrales de CVSS, ...
