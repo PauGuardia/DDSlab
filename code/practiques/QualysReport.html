@@ -11,7 +11,7 @@
 
 <meta name="author" content="Pau Guàrdia" />
 
-<meta name="date" content="2023-03-15" />
+<meta name="date" content="2023-03-16" />
 
 <title>Analysis of Qualys KDB</title>
 
@@ -576,7 +576,7 @@ display: none;
 
 <h1 class="title toc-ignore">Analysis of Qualys KDB</h1>
 <h4 class="author">Pau Guàrdia</h4>
-<h4 class="date">2023-03-15</h4>
+<h4 class="date">2023-03-16</h4>
 
 </div>
 
@@ -616,6 +616,9 @@ modified_date
 <th style="text-align:left;">
 vcss
 </th>
+<th style="text-align:left;">
+cve
+</th>
 </tr>
 </thead>
 <tbody>
@@ -637,6 +640,9 @@ Information gathering
 </td>
 <td style="text-align:left;">
 2018-01-04 17:39:37
+</td>
+<td style="text-align:left;">
+NA
 </td>
 <td style="text-align:left;">
 NA
@@ -664,6 +670,9 @@ RPC
 <td style="text-align:left;">
 NA
 </td>
+<td style="text-align:left;">
+NA
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -687,6 +696,9 @@ RPC
 <td style="text-align:left;">
 5
 </td>
+<td style="text-align:left;">
+NA
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -706,6 +718,9 @@ General remote services
 </td>
 <td style="text-align:left;">
 1999-01-01 08:00:00
+</td>
+<td style="text-align:left;">
+NA
 </td>
 <td style="text-align:left;">
 NA
@@ -733,6 +748,9 @@ Backdoors and trojan horses
 <td style="text-align:left;">
 0
 </td>
+<td style="text-align:left;">
+NA
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
@@ -755,6 +773,9 @@ Backdoors and trojan horses
 </td>
 <td style="text-align:left;">
 10
+</td>
+<td style="text-align:left;">
+NA
 </td>
 </tr>
 </tbody>
@@ -790,6 +811,29 @@ map:</p>
   }
 })</code></pre>
 <p>Aún así la función era demasiado costosa computacionalmente.</p>
+<p>Finalmente, se ha podido conseguir el resultado esperado con el
+siguiente código:</p>
+<pre class="r"><code># Definir la expresión regular que buscará los códigos CVE
+patron_cve &lt;- &quot;CVE-\\d{4}-\\d{4}&quot;
+
+# Crear una función que buscará los códigos CVE y los unirá separados por comas
+unir_cves &lt;- function(cadena) {
+  cves_encontrados &lt;- unlist(regmatches(cadena, gregexpr(patron_cve, cadena, perl = TRUE)))
+  cves_encontrados &lt;- paste(cves_encontrados, collapse = &quot;, &quot;)
+  return(cves_encontrados)
+}
+
+# Aplicar la función a cada elemento de la lista
+mi_lista_limpia &lt;- lapply(cve_list, function(x) ifelse(is.na(x), NA, unir_cves(x)))
+cves &lt;- as.character(unlist(mi_lista_limpia))</code></pre>
+<p>Analizando un poco el código anterior, la técnica usada
+principalmente se basa en obtener una primera lista de todo lo que tiene
+CVE_LIST de cada elemento vuln, obteniendo NA en caso de no tener. A
+partir de ahi nos creamos una función para modificar un poco los valores
+de esta lista para poder obtener solamente el código de la CVE-XXXX-XXX
+asociados a cada vulnerabilidad separados por comas. Finalmente, como el
+resultado obtenido es una lista, pasamos la lista a vector para que se
+pueda incluir correctamente al dataframe</p>
 </div>
 <div id="conclusion" class="section level2">
 <h2>Conclusion</h2>

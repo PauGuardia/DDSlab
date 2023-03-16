@@ -31,6 +31,22 @@ severities <- html_text(html_elements(doc, xpath = "//VULN/SEVERITY_LEVEL"))
 published_dates <- html_text(html_elements(doc, xpath = "//VULN/PUBLISHED_DATETIME"))
 modified_dates <- html_text(html_elements(doc, xpath = "//VULN/LAST_SERVICE_MODIFICATION_DATETIME"))
 vcss_list <-  html_text(xml_find_first(vulns, "./CVSS/BASE"))
+cve_list <- html_text(xml_find_first(vulns,"./CVE_LIST"))
+# Definir la expresión regular que buscará los códigos CVE
+patron_cve <- "CVE-\\d{4}-\\d{4}"
+
+# Crear una función que buscará los códigos CVE y los unirá separados por comas
+unir_cves <- function(cadena) {
+  cves_encontrados <- unlist(regmatches(cadena, gregexpr(patron_cve, cadena, perl = TRUE)))
+  cves_encontrados <- paste(cves_encontrados, collapse = ", ")
+  return(cves_encontrados)
+}
+
+# Aplicar la función a cada elemento de la lista
+mi_lista_limpia <- lapply(cve_list, function(x) ifelse(is.na(x), NA, unir_cves(x)))
+cves <- as.character(unlist(mi_lista_limpia))
+
+
 kdb <- data.frame(qid = qids,
                   vuln_type = vuln_types,
                   category = categories,
@@ -38,6 +54,7 @@ kdb <- data.frame(qid = qids,
                   published_date = published_dates,
                   modified_date = modified_dates,
                   vcss = vcss_list,
+                  cve = cves,
                   stringsAsFactors = FALSE)
 kdb$published_date <- as.POSIXct.POSIXlt(strptime(x = kdb$published_date, format = "%Y-%m-%dT%TZ"))
 kdb$modified_date <- as.POSIXct.POSIXlt(strptime(x = kdb$modified_date, format = "%Y-%m-%dT%TZ"))
@@ -77,6 +94,25 @@ cve_list <- map(vuln_list, ~{
 ```
 
 Aún así la función era demasiado costosa computacionalmente.
+
+Finalmente, se ha podido conseguir el resultado esperado con el siguiente código:
+```{r echo=TRUE, eval=FALSE}
+# Definir la expresión regular que buscará los códigos CVE
+patron_cve <- "CVE-\\d{4}-\\d{4}"
+
+# Crear una función que buscará los códigos CVE y los unirá separados por comas
+unir_cves <- function(cadena) {
+  cves_encontrados <- unlist(regmatches(cadena, gregexpr(patron_cve, cadena, perl = TRUE)))
+  cves_encontrados <- paste(cves_encontrados, collapse = ", ")
+  return(cves_encontrados)
+}
+
+# Aplicar la función a cada elemento de la lista
+mi_lista_limpia <- lapply(cve_list, function(x) ifelse(is.na(x), NA, unir_cves(x)))
+cves <- as.character(unlist(mi_lista_limpia))
+```
+
+Analizando un poco el código anterior, la técnica usada principalmente se basa en obtener una primera lista de todo lo que tiene CVE_LIST de cada elemento vuln, obteniendo NA en caso de no tener. A partir de ahi nos creamos una función para modificar un poco los valores de esta lista para poder obtener solamente el código de la CVE-XXXX-XXX asociados a cada vulnerabilidad separados por comas. Finalmente, como el resultado obtenido es una lista, pasamos la lista a vector para que se pueda incluir correctamente al dataframe
 ```{r add_cwe, echo=FALSE}
 
 
