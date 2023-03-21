@@ -88,11 +88,19 @@ remplazo_palabras <- function(x,palabra_buscar, palabra_reemplazar){
 }
 #Cambiamos Users por user
 course_corpus5 <- tm_map(course_corpus4, content_transformer(remplazo_palabras),palabra_buscar="users",palabra_reemplazar="user")
+#Cambiamos vulnerabilities por vulnerability
+course_corpus6 <- tm_map(course_corpus5, content_transformer(remplazo_palabras),palabra_buscar="vulnerabilities",palabra_reemplazar="vulnerability")
+#Cambiamos versions por version
+course_corpus7 <- tm_map(course_corpus6, content_transformer(remplazo_palabras),palabra_buscar="versions",palabra_reemplazar="version")
+#Cambiamos compromised por compromise
+course_corpus8 <- tm_map(course_corpus7, content_transformer(remplazo_palabras),palabra_buscar="compromised",palabra_reemplazar="compromise")
+#Cambiamos corrupted por corrupt
+course_corpus9 <- tm_map(course_corpus8, content_transformer(remplazo_palabras),palabra_buscar="corrupted",palabra_reemplazar="corrupt")
+#Cambiamos corruption por corrupt
+course_corpus10 <- tm_map(course_corpus9, content_transformer(remplazo_palabras),palabra_buscar="corruption",palabra_reemplazar="corrupt")
 #Generate TF-IDF matrix
-course_dtm <- DocumentTermMatrix(course_corpus5)
-course_dtm
-
-findFreqTerms(course_dtm,5)
+course_dtm <- DocumentTermMatrix(course_corpus10)
+findFreqTerms(course_dtm,3)
 #Remove terms not in 90% of the documents. Only have those that are there
 #in atleast 2 documents
 dense_course_dtm <- removeSparseTerms(course_dtm, .85)
@@ -104,7 +112,6 @@ conv_counts <- function(x) {
   x <- factor(x, levels = c(0, 1), labels = c("No", "Yes"))
 }
 class_dtm <- apply(dense_course_dtm, MARGIN = 2, conv_counts)
-class_dtm
 ```
 
 
