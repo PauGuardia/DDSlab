@@ -1,3 +1,26 @@
+---
+title: "Mejora modelo clasificación de vulnerabilidadesB"
+author: "Pau Susin Alsina & Pau Guàrdia Sabartés"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    toc: true
+    toc_depth: 5
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    #toc_cols: 4
+    
+  pdf_document: default
+---
+
+#Mejora modelo clasificación de vulnerabilidades
+##Análisis y modificación del Dataset
+El método que vamos a seguir es ir mirando en la tabla class_dtm (que contiene las 24 palabras que se van a usar para la detección) aquellas palabras que són muy similares que pueden ser lo mismo.
+En este punto lo que se va a realizar es modificar una de las palabras por la otra (considerando que son la misma).
+
+```{r setup, include=false}
 library(dplyr)
 library(tm)
 library(caret)
@@ -58,10 +81,17 @@ course_corpus2 <- tm_map(course_corpus, content_transformer(tolower))
 course_corpus3 <- tm_map(course_corpus2, removePunctuation)
 #Remove stopwords
 course_corpus4 <- tm_map(course_corpus3, removeWords, stopwords())
-inspect(course_corpus4[[1]])
+#inspect(course_corpus4[[1]])
+#Creamos una función para reemplazar palabras
+remplazo_palabras <- function(x,palabra_buscar, palabra_reemplazar){
+  gsub(palabra_buscar,palabra_reemplazar,x)
+}
+#Cambiamos Users por user
+course_corpus5 <- tm_map(course_corpus4, content_transformer(remplazo_palabras),palabra_buscar="users",palabra_reemplazar="user")
 #Generate TF-IDF matrix
-course_dtm <- DocumentTermMatrix(course_corpus4)
+course_dtm <- DocumentTermMatrix(course_corpus5)
 course_dtm
+
 findFreqTerms(course_dtm,5)
 #Remove terms not in 90% of the documents. Only have those that are there
 #in atleast 2 documents
@@ -75,31 +105,17 @@ conv_counts <- function(x) {
 }
 class_dtm <- apply(dense_course_dtm, MARGIN = 2, conv_counts)
 class_dtm
-#-------------------------------------------------------------------
-#                  4.3.: Building the model
-#-------------------------------------------------------------------
-#Load the classifications for the descriptions
-# course_classes = scan("data/Course-Classification.txt", what="", sep="\n")
-course_classes <- kdb_ml$critical
-#install.packages("caret")
-#Random split of training and testing sets
-train_set <- createDataPartition(y=course_classes, p=.7,list=FALSE)
-#spliting the dtm
-train_dtm <- class_dtm[train_set,]
-test_dtm <-class_dtm[-train_set,]
-#split the course_classes
-train_classes <- course_classes[train_set]
-test_classes <- course_classes[-train_set]
-#train the model using naive bayes
-course_model <- train( data.frame(train_dtm), train_classes, method="nb")
-course_model
+```
 
-#-------------------------------------------------------------------
-#                  4.3.: Predictions for Text
-#-------------------------------------------------------------------
-#Predict for the test data
-course_predictions <- predict(course_model,test_dtm)
-#Analyze prediction accuracy
-confusionMatrix(table(course_predictions , test_classes))
-#-------------------------------------------------------------------
 
+##Muestras de entreno
+El objetico de este punto es evaluar el % de muestras criticas a usar a la hora de entrenar el modelo.
+Observando la base de datos de Qualys nos damos cuenta que existen muchas más vulnerabilidades definidas como no críticas que aquellas definidas como críticas. Por lo que seguramente el porcentaje de muestras críticas usadas para el entreno debe ser menor al de no críticas.
+
+Se creará un gráfico que muestre cuál es el mejor porcentaje a usar para obtener una mejor accuracy.
+
+
+##Optimizar los parámetros del modelo
+
+##Modificación del modelo (n-gramas)
+En vez de utilizar palabras para la detección, usar la concanetación de palabras.
