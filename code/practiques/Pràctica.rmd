@@ -11,8 +11,6 @@ output:
       smooth_scroll: true
     number_sections: true
     #toc_cols: 4
-    
-  pdf_document: default
 ---
 
 #Mejora modelo clasificación de vulnerabilidades
@@ -28,13 +26,11 @@ library(caret)
 # Read XML document
 raw.file = "../../data/qualys/latest.qkdb.xml.zip"
 doc <- xml2::read_xml(raw.file)
-
 # Extract QID, SEVERITY_LEVEL and DIAGNOSIS
 kdb_txt <- rvest::html_text(rvest::html_elements(doc, xpath="//VULN[DIAGNOSIS]/*[self::QID or self::SEVERITY_LEVEL or self::DIAGNOSIS]"))
 kdb_txt <- matrix(kdb_txt, nrow = length(kdb_txt)/3, ncol = 3, byrow = TRUE)
 kdb_txt <- as.data.frame.matrix(kdb_txt)
 names(kdb_txt) <- c("qid", "severity", "diagnosis")
-
 # Tidy data frame
 kdb_txt$qid <- as.integer(kdb_txt$qid)
 kdb_txt$severity <- as.integer(kdb_txt$severity)
@@ -42,21 +38,20 @@ kdb_txt$diagnosis <- textclean::replace_html(kdb_txt$diagnosis)
 kdb_txt$critical <- ifelse(test = kdb_txt$severity < 5, yes = "NO", no = "YES")
 kdb_txt$criticalb <- kdb_txt$severity == 5
 
+head(kdb_txt)
+
 # Text analysis
 ## Stopwords
 freq_word <- sort(table(unlist(strsplit(kdb_txt$diagnosis, " "))), decreasing = TRUE)
 kdb_words <- names(freq_word)[(which(!(names(freq_word) %in% stopwords::stopwords())))]
 ## Characters
 freq_char <- sort(table(unlist(strsplit(kdb_txt$diagnosis, ""))), decreasing = TRUE)
-
 kdb_txt$descr <- textclean::replace_symbol(kdb_txt$diagnosis)
 freq_char2 <- sort(table(unlist(strsplit(kdb_txt$descr, ""))), decreasing = TRUE)
 freq_char2
-
 # Prepare data for training
 kdb_critical <- kdb_txt %>% filter(critical == "YES")
 kdb_other <- kdb_txt %>% filter(critical == "NO")
-
 kdb_ml <- bind_rows(kdb_critical %>% sample_n(2000),
                     kdb_other %>% sample_n(2000)) %>%
           sample_n(4000) %>%
@@ -153,11 +148,9 @@ Otro valor a determinar es el número de muestras que se utiliza para entrenar e
 La primera prueba que se ha realizado, contiene un número total de muetstras de entrenamiento igual a 4000. Se han evaluado los porcentajes 5,10,20,30,40 y 50 de muestras críticas, por el hecho mencionado anteriormente. 
 
 ```{r porcen, include=FALSE, echo=FALSE}
-
 total <- 4000
 porcentajes <- c(0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5)
 accuracies <- numeric()
-
 for (x in porcentajes){
   
   print(x*total)
@@ -241,14 +234,12 @@ for (x in porcentajes){
   #-------------------------------------------------------------------
   accuracies <- c(accuracies, confusionMatrix(table(course_predictions , test_classes))$overall["Accuracy"])
 }
-
 ```
 
 ```{r plot,echo=FALSE}
 plot(porcentajes, accuracies, col = "blue", type="o")
 lines(porcentajes,accuracies)
 title("Evaluación Accuracy vs Porcentaje muestras criticas")
-
 ```
 
 Los resultados obtenidos son muy significativos. Tal y como se observa, si usamos un porcentaje menor de muestras críticas, los resultados mejoran. Aun así cabe destacar el resultado obtenido con el 5% de muestras críticas. Cuando se entrena el modelo con un 5% de muestras críticas y un 95% de muestras no críticas, se obtiene un accuracy del 92% aproximadamente. Este hecho se debe a que estamos entrenando al modelo a saber determinar de forma muy correcta todas aquellas muestras que NO son críticas, y por consecuencia, puede determinar de forma muy correcta las que si que lo son.
@@ -256,11 +247,11 @@ Los resultados obtenidos son muy significativos. Tal y como se observa, si usamo
 Con los resultados anteriores, los valores que se evaluarán de porcentaje a partir de ahora serán (5%, 10%, 15%, 20% y 25%). A continuación podemos observar todos los gráficos que vamos a obtener 
 
 ```{r totales, fig.show="only", include=FALSE}
-
 totales <- c(2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000)
 porcentajes <- c(0.05, 0.1, 0.15, 0.2, 0.25)
 accuracies <- numeric()
 for (total in totales){
+  print (total)
   for (x in porcentajes){
     
     print(x*total)
@@ -344,15 +335,12 @@ for (total in totales){
     #-------------------------------------------------------------------
     accuracies <- c(accuracies, confusionMatrix(table(course_predictions , test_classes))$overall["Accuracy"])
   }
-
-plot(porcentajes, accuracies, col = "blue", type="o")
-text(porcentajes, accuracies, labels = round(accuracies, 2), pos = 3)
-lines(porcentajes,accuracies)
-title(paste("Evaluación Accuracy vs Porcentaje muestras criticas. N=", total))
+  print("Total 1")
+  plot(porcentajes, accuracies, col = "blue", type="o")
+  text(porcentajes, accuracies, labels = round(accuracies, 2), pos = 3)
+  lines(porcentajes,accuracies)
+  title(paste("Evaluación Accuracy vs Porcentaje muestras criticas. N=", total))
+  accuracies <- numeric()
 }
 ```
 
-##Optimizar los parámetros del modelo
-
-##Modificación del modelo (n-gramas)
-En vez de utilizar palabras para la detección, usar la concanetación de palabras.

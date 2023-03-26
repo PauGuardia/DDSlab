@@ -1,6 +1,7 @@
 library(dplyr)
 library(tm)
 library(caret)
+library(ggplot2)
 
 # Read XML document
 raw.file = "../../data/qualys/latest.qkdb.xml.zip"
@@ -38,6 +39,7 @@ totales <- c(2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000)
 porcentajes <- c(0.05, 0.1, 0.15, 0.2, 0.25)
 accuracies <- numeric()
 for (total in totales){
+  print(total)
   for (x in porcentajes){
     
     print(x*total)
@@ -121,8 +123,17 @@ for (total in totales){
     #-------------------------------------------------------------------
     accuracies <- c(accuracies, confusionMatrix(table(course_predictions , test_classes))$overall["Accuracy"])
   }
-
-plot(porcentajes, accuracies, col = "blue", type="o")
-lines(porcentajes,accuracies)
-title("Evaluación Accuracy vs Porcentaje muestras criticas")
+  
+  df <- data.frame(porcentajes = porcentajes, accuracies = accuracies)
+  # Crea el gráfico con ggplot2
+  ggplot(df, aes(x = porcentajes, y = accuracies)) +
+    geom_line(col = "blue") +
+    geom_point(shape = 19, size = 3, col = "blue") +
+    geom_text(aes(label = round(accuracies, 2)), hjust = 1.2, vjust = 0.5) +
+    labs(title = paste("Evaluación Accuracy vs Porcentaje muestras criticas. N=", total))
+  
+  name <- paste("plots/myplot", total, ".png", sep = "")
+  ggsave(name, width = 6, height = 4, dpi = 300)
+  
+  accuracies <- numeric()
 }
